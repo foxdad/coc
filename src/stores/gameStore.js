@@ -278,11 +278,39 @@ export const useGameStore = defineStore('game', () => {
   })
   const currentArmy = computed(() => troops.value.reduce((sum, t) => sum + t.count * t.population, 0))
 
-  // 建筑工人
+  // 建筑工人（每个工人有独立的精力值）
   const builders = ref([
-    { id: 1, busy: false, task: null, endTime: null },
+    { id: 1, busy: false, task: null, endTime: null, fatigue: 100 },
   ])
   const freeBuilders = computed(() => builders.value.filter(b => !b.busy).length)
+
+  // 建筑工人平均疲劳值（用于判断NPC入侵）
+  const builderFatigue = computed(() => {
+    if (builders.value.length === 0) return 100
+    const total = builders.value.reduce((sum, b) => sum + (b.fatigue ?? 100), 0)
+    return Math.round(total / builders.value.length)
+  })
+  const lastFatigueCheckTime = ref(Date.now())
+  
+  // NPC入侵系统
+  const npcInvasion = ref({
+    active: false,           // 是否正在入侵
+    attacker: null,          // 入侵者信息
+    result: null,            // 入侵结果
+    lastInvasionTime: null,  // 上次入侵时间
+    invasionHistory: []      // 入侵历史记录
+  })
+  
+  // NPC村庄列表
+  const npcVillages = [
+    { name: '哥布林强盗', thLevel: 3, strength: 0.3, greed: 0.15 },
+    { name: '野蛮人部落', thLevel: 4, strength: 0.4, greed: 0.2 },
+    { name: '暗影掠夺者', thLevel: 5, strength: 0.5, greed: 0.25 },
+    { name: '骷髅军团', thLevel: 6, strength: 0.6, greed: 0.3 },
+    { name: '巨人联盟', thLevel: 7, strength: 0.7, greed: 0.35 },
+    { name: '飞龙骑士团', thLevel: 8, strength: 0.8, greed: 0.4 },
+    { name: '暗黑领主', thLevel: 9, strength: 0.9, greed: 0.45 }
+  ]
 
   // 升级队列 - 存储正在升级的建筑
   // 格式: { buildingId, buildingType, startTime, endTime, targetLevel }
@@ -576,6 +604,197 @@ export const useGameStore = defineStore('game', () => {
 
   // 树木类型
   const treeTypes = ['橡树', '松树', '灌木', '蘑菇', '石头', '宝箱树']
+
+  // 检查建筑工人疲劳值（每分钟检查一次，每个工人单独计算）
+  function checkBuilderFatigue() {
+    const now = Date.now()
+    const elapsed = now - lastFatigueCheckTime.value
+    
+    // 每分钟检查一次
+    if (elapsed >= 60 * 1000) {
+      lastFatigueCheckTime.value = now
+      
+      // 每个工人单独计算疲劳值
+      builders.value.forEach(builder => {
+        // 确保有fatigue属性
+        if (builder.fatigue === undefined) builder.fatigue = 100
+        
+        if (builder.busy) {
+          // 工作中的工人消耗疲劳值（每分钟-3~5点）
+          const fatigueDecrease = 3 + Math.floor(Math.random() * 3)
+          builder.fatigue = Math.max(0, builder.fatigue - fatigueDecrease)
+        } else {
+          // 空闲时恢复疲劳值（每分钟+5点）
+          builder.fatigue = Math.min(100, builder.fatigue + 5)
+        }
+      })
+      
+      // 平均疲劳值≤50%时触发NPC入侵检查
+      if (builderFatigue.value <= 50) {
+        checkNPCInvasion()
+      }
+    }
+  }
+  
+  // 恢复指定工人的疲劳值（使用宝石）
+  function restoreBuilderFatigue(builderId = null, amount = 50) {
+    const gemCost = Math.ceil(amount / 10) // 每10点疲劳值消耗1宝石
+    if (gems.value < gemCost) {
+      return { success: false, message: '宝石不足' }
+    }
+    
+    if (builderId !== null) {
+      // 恢复指定工人
+      const builder = builders.value.find(b => b.id === builderId)
+      if (builder) {
+        gems.value -= gemCost
+        builder.fatigue = Math.min(100, (builder.fatigue ?? 0) + amount)
+        return { success: true, message: `消耗 ${gemCost} 宝石，工人${builder.id}恢复 ${amount} 点精力` }
+      }
+      return { success: false, message: '工人不存在' }
+    } else {
+      // 恢复所有工人
+      const totalCost = gemCost * builders.value.length
+      if (gems.value < totalCost) {
+        return { success: false, message: `宝石不足，需要 ${totalCost} 宝石` }
+      }
+      gems.value -= totalCost
+      builders.value.forEach(b => {
+        b.fatigue = Math.min(100, (b.fatigue ?? 0) + amount)
+      })
+      return { success: true, message: `消耗 ${totalCost} 宝石，所有工人恢复 ${amount} 点精力` }
+    }
+  }
+  
+  // 检查NPC入侵
+  function checkNPCInvasion() {
+    // 如果正在入侵中或刚入侵过（5分钟冷却），跳过
+    if (npcInvasion.value.active) return
+    if (npcInvasion.value.lastInvasionTime && 
+        Date.now() - npcInvasion.value.lastInvasionTime < 5 * 60 * 1000) return
+    
+    // 疲劳值越低，入侵概率越高
+    // 疲劳值50: 5%概率, 疲劳值40: 15%概率, 疲劳值30: 25%概率, 疲劳值20: 40%概率, 疲劳值10: 60%概率, 疲劳值0: 80%概率
+    let invasionChance = 0.05
+    if (builderFatigue.value <= 10) invasionChance = 0.6
+    else if (builderFatigue.value <= 20) invasionChance = 0.4
+    else if (builderFatigue.value <= 30) invasionChance = 0.25
+    else if (builderFatigue.value <= 40) invasionChance = 0.15
+    
+    if (Math.random() < invasionChance) {
+      triggerNPCInvasion()
+    }
+  }
+  
+  // 触发NPC入侵
+  function triggerNPCInvasion() {
+    // 根据玩家大本营等级选择合适的NPC
+    const eligibleNPCs = npcVillages.filter(npc => 
+      npc.thLevel >= townHallLevel.value - 2 && npc.thLevel <= townHallLevel.value + 1
+    )
+    
+    if (eligibleNPCs.length === 0) return
+    
+    const attacker = eligibleNPCs[Math.floor(Math.random() * eligibleNPCs.length)]
+    
+    npcInvasion.value.active = true
+    npcInvasion.value.attacker = {
+      ...attacker,
+      attackTime: Date.now()
+    }
+    
+    // 自动进行防御战斗
+    setTimeout(() => {
+      resolveNPCInvasion()
+    }, 100)
+  }
+  
+  // 解决NPC入侵
+  function resolveNPCInvasion() {
+    if (!npcInvasion.value.active || !npcInvasion.value.attacker) return
+    
+    const attacker = npcInvasion.value.attacker
+    
+    // 计算防御力（基于防御建筑）
+    let defenseStrength = 0
+    const defenseBuildings = buildings.value.filter(b => 
+      ['cannon', 'archertower', 'mortar', 'airdefense', 'wizardtower'].includes(b.type)
+    )
+    defenseBuildings.forEach(b => {
+      const baseDefense = { cannon: 10, archertower: 12, mortar: 15, airdefense: 20, wizardtower: 25 }
+      defenseStrength += (baseDefense[b.type] || 10) * b.level * (b.count || 1)
+    })
+    
+    // 大本营等级也提供基础防御
+    defenseStrength += townHallLevel.value * 20
+    
+    // NPC攻击力
+    const attackStrength = attacker.thLevel * 50 * attacker.strength
+    
+    // 计算战斗结果
+    const defenseRatio = defenseStrength / (defenseStrength + attackStrength)
+    const randomFactor = 0.8 + Math.random() * 0.4 // 0.8-1.2随机因子
+    const finalDefenseRate = Math.min(1, defenseRatio * randomFactor)
+    
+    // 防御成功率
+    const defended = finalDefenseRate > 0.5
+    
+    let goldLost = 0
+    let elixirLost = 0
+    let darkLost = 0
+    
+    if (!defended) {
+      // 防御失败，损失资源
+      const lootRate = attacker.greed * (1 - finalDefenseRate)
+      goldLost = Math.floor(gold.value * lootRate)
+      elixirLost = Math.floor(elixir.value * lootRate)
+      if (townHallLevel.value >= 7) {
+        darkLost = Math.floor(darkElixir.value * lootRate * 0.5)
+      }
+      
+      gold.value -= goldLost
+      elixir.value -= elixirLost
+      darkElixir.value -= darkLost
+      
+      // 损失奖杯
+      const trophyLoss = Math.floor(Math.random() * 15) + 5
+      trophies.value = Math.max(0, trophies.value - trophyLoss)
+    }
+    
+    // 记录结果
+    const result = {
+      defended,
+      attackerName: attacker.name,
+      attackerTH: attacker.thLevel,
+      goldLost,
+      elixirLost,
+      darkLost,
+      defenseRate: Math.floor(finalDefenseRate * 100),
+      time: Date.now()
+    }
+    
+    npcInvasion.value.result = result
+    npcInvasion.value.lastInvasionTime = Date.now()
+    
+    // 添加到历史记录
+    npcInvasion.value.invasionHistory.unshift(result)
+    if (npcInvasion.value.invasionHistory.length > 10) {
+      npcInvasion.value.invasionHistory.pop()
+    }
+    
+    // 入侵结束后，所有工人疲劳值略微恢复（工人被吓醒了）
+    builders.value.forEach(b => {
+      b.fatigue = Math.min(100, (b.fatigue ?? 0) + 10)
+    })
+    
+    autoSave()
+  }
+  
+  // 清除入侵结果（用户确认后）
+  function clearInvasionResult() {
+    npcInvasion.value.active = false
+    npcInvasion.value.result = null
+  }
   
   // 检查并生长新树木（每1分钟有机会生长一棵）
   function checkTreeGrowth() {
@@ -648,7 +867,12 @@ export const useGameStore = defineStore('game', () => {
       resourceMultiplier: resourceMultiplier.value,
       heroes: heroes.value,
       heroUpgradeQueue: heroUpgradeQueue.value,
-      campaignProgress: campaignProgress.value
+      campaignProgress: campaignProgress.value,
+      lastFatigueCheckTime: lastFatigueCheckTime.value,
+      npcInvasion: {
+        lastInvasionTime: npcInvasion.value.lastInvasionTime,
+        invasionHistory: npcInvasion.value.invasionHistory
+      }
     }
     localStorage.setItem('coc-text-game-save', JSON.stringify(saveData))
     return true
@@ -709,7 +933,11 @@ export const useGameStore = defineStore('game', () => {
       lastTreeGrowTime.value = saveData.lastTreeGrowTime || Date.now()
       buildings.value = saveData.buildings || [...defaultBuildings]
       troops.value = saveData.troops || []
-      builders.value = saveData.builders || [{ id: 1, busy: false, task: null, endTime: null }]
+      builders.value = saveData.builders || [{ id: 1, busy: false, task: null, endTime: null, fatigue: 100 }]
+      // 确保每个工人都有fatigue属性
+      builders.value.forEach(b => {
+        if (b.fatigue === undefined) b.fatigue = 100
+      })
       upgradeQueue.value = saveData.upgradeQueue || []
       trainingQueue.value = saveData.trainingQueue || []
       lastCollectTime.value = saveData.lastCollectTime || Date.now()
@@ -723,6 +951,11 @@ export const useGameStore = defineStore('game', () => {
       heroUpgradeQueue.value = saveData.heroUpgradeQueue || []
       if (saveData.campaignProgress) {
         campaignProgress.value = saveData.campaignProgress
+      }
+      lastFatigueCheckTime.value = saveData.lastFatigueCheckTime || Date.now()
+      if (saveData.npcInvasion) {
+        npcInvasion.value.lastInvasionTime = saveData.npcInvasion.lastInvasionTime
+        npcInvasion.value.invasionHistory = saveData.npcInvasion.invasionHistory || []
       }
       
       // 修复存档中的建筑maxLevel
@@ -873,6 +1106,11 @@ export const useGameStore = defineStore('game', () => {
     sidebarCollapsed,
     toggleSidebar,
     checkTreeGrowth,
-    removeTree
+    removeTree,
+    builderFatigue,
+    checkBuilderFatigue,
+    restoreBuilderFatigue,
+    npcInvasion,
+    clearInvasionResult
   }
 })

@@ -80,7 +80,7 @@
       </button>
     </div>
     
-    <!-- 获取宝石 - 暂时注释
+   <!-- 暂时注释
     <h3 class="section-title">获取宝石</h3>
     <div class="gem-packs">
       <div v-for="pack in gemPacks" :key="pack.id" class="gem-pack" @click="buyGems(pack)">
@@ -91,7 +91,7 @@
       </div>
     </div>
     <p class="text-muted text-center">* 演示版本，点击即可获得宝石</p>
-    -->
+     -->
     
     <!-- 限时特惠 -->
     <h3 class="section-title">限时特惠</h3>

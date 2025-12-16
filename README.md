@@ -1,5 +1,7 @@
 # COC 文字版 - 部落冲突文字游戏
 
+> 🎮 **在线体验**: [https://coc.xiaokexian.top/](https://coc.xiaokexian.top/)
+
 一款基于 Vue3 开发的文字版部落冲突游戏，还原经典 COC 玩法，纯文字交互体验。
 
 ## 游戏特色

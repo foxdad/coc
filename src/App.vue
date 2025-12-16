@@ -45,6 +45,15 @@ const hasUpgrades = computed(() => {
 // 应用启动时初始化游戏（加载存档）
 onMounted(() => {
   store.initGame()
+  
+  // 每10秒检查一次：升级完成、训练完成、资源收集、树木生长、建筑工人疲劳
+  setInterval(() => {
+    store.checkUpgrades()
+    store.checkTraining()
+    store.collectResources()
+    store.checkTreeGrowth()
+    store.checkBuilderFatigue()
+  }, 10000)
 })
 </script>
 

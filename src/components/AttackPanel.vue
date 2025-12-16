@@ -55,7 +55,7 @@
       
       <div class="target-defense">
         <span class="defense-label">防御配置:</span>
-        <span v-for="def in currentTarget.defenses" :key="def" class="defense-tag">{{ def }}</span>
+        <span v-for="(def, index) in currentTarget.defenseDisplay" :key="index" class="defense-tag">{{ def }}</span>
       </div>
       
       <!-- 兵力消耗警告 -->
@@ -332,6 +332,12 @@ function startAttack() {
   store.addElixir(elixirGained)
   store.trophies = Math.max(0, store.trophies + trophiesGained)
   store.troops.forEach(t => t.count = 0)
+  
+  // 进攻消耗所有工人精力（每人-10~20点）
+  store.builders.forEach(b => {
+    const fatigueCost = 10 + Math.floor(Math.random() * 11)
+    b.fatigue = Math.max(0, (b.fatigue ?? 100) - fatigueCost)
+  })
   
   battleResult.value = { victory, stars, destruction, goldGained, elixirGained, trophiesGained }
   
