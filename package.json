@@ -9,8 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "gsap": "^3.14.2",
+    "konva": "^10.0.12",
+    "pinia": "^2.1.7",
     "vue": "^3.4.0",
-    "pinia": "^2.1.7"
+    "vue-konva": "^3.2.6"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",

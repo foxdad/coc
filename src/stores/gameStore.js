@@ -162,7 +162,13 @@ export const useGameStore = defineStore('game', () => {
     // 暗黑重油罐: 15分钟, 30分钟
     darkstorage: [900, 1800],
     // 暗黑兵营: 30分钟, 45分钟
-    darkbarracks: [1800, 2700]
+    darkbarracks: [1800, 2700],
+    // 防空火箭: 15分钟, 20分钟, 25分钟
+    airdefense: [900, 1200, 1500],
+    // 法师塔: 15分钟, 20分钟, 25分钟
+    wizardtower: [900, 1200, 1500],
+    // X连弩: 1小时
+    xbow: [3600]
   }
   
   // 获取储金罐/圣水瓶当前最高可升级等级
@@ -900,6 +906,9 @@ export const useGameStore = defineStore('game', () => {
     cannon: 9,
     archertower: 8,
     mortar: 5,
+    airdefense: 4,
+    wizardtower: 4,
+    xbow: 2,
     laboratory: 5,
     darkelixirdrill: 3,
     darkstorage: 3

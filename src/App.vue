@@ -12,6 +12,7 @@
         <CampaignPanel v-else-if="store.currentMenu === 'campaign'" />
         <DefensePanel v-else-if="store.currentMenu === 'defense'" />
         <AttackPanel v-else-if="store.currentMenu === 'attack'" />
+        <BattleFieldPanel v-else-if="store.currentMenu === 'battlefield'" />
         <ShopPanel v-else-if="store.currentMenu === 'shop'" />
         <SettingsPanel v-else-if="store.currentMenu === 'settings'" />
       </main>
@@ -34,6 +35,7 @@ import ResearchPanel from './components/ResearchPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import HeroesPanel from './components/HeroesPanel.vue'
 import CampaignPanel from './components/CampaignPanel.vue'
+import BattleFieldPanel from './components/BattleFieldPanel.vue'
 
 const store = useGameStore()
 

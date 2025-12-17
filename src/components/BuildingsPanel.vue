@@ -130,6 +130,9 @@ const buildingCategories = {
   cannon: 'defense',
   archertower: 'defense',
   mortar: 'defense',
+  airdefense: 'defense',
+  wizardtower: 'defense',
+  xbow: 'defense',
   townhall: 'other',
 }
 
@@ -174,12 +177,51 @@ const availableNewBuildings = computed(() => {
     available.push({ type: 'barracks', name: '兵营', cost: 500 })
   }
   
-  if (store.townHallLevel >= 2 && !store.buildings.find(b => b.type === 'archertower')) {
-    available.push({ type: 'archertower', name: '箭塔', cost: 2000 })
+  // 加农炮数量限制：1本1个，2本2个，3本3个，4本4个，5本5个，6本6个，7本7个，8本8个，9本9个
+  const maxCannons = Math.min(store.townHallLevel, 9)
+  if (getBuildingCount('cannon') < maxCannons) {
+    available.push({ type: 'cannon', name: '加农炮', cost: 1000 })
   }
-  if (store.townHallLevel >= 3 && !store.buildings.find(b => b.type === 'mortar')) {
-    available.push({ type: 'mortar', name: '迫击炮', cost: 10000 })
+  
+  // 箭塔数量限制：2本1个，3本2个，4本3个，5本4个，6本5个，7本6个，8本7个，9本8个
+  if (store.townHallLevel >= 2) {
+    const maxArcherTowers = store.townHallLevel - 1
+    if (getBuildingCount('archertower') < maxArcherTowers) {
+      available.push({ type: 'archertower', name: '箭塔', cost: 2000 })
+    }
   }
+  
+  // 迫击炮数量限制：3本1个，5本2个，7本3个，9本4个
+  if (store.townHallLevel >= 3) {
+    const maxMortars = store.townHallLevel >= 9 ? 4 : store.townHallLevel >= 7 ? 3 : store.townHallLevel >= 5 ? 2 : 1
+    if (getBuildingCount('mortar') < maxMortars) {
+      available.push({ type: 'mortar', name: '迫击炮', cost: 100000 })
+    }
+  }
+  
+  // 防空火箭数量限制：4本1个，6本2个，8本3个
+  if (store.townHallLevel >= 4) {
+    const maxAirDefense = store.townHallLevel >= 8 ? 3 : store.townHallLevel >= 6 ? 2 : 1
+    if (getBuildingCount('airdefense') < maxAirDefense) {
+      available.push({ type: 'airdefense', name: '防空火箭', cost: 150000 })
+    }
+  }
+  
+  // 法师塔数量限制：5本1个，6本2个，8本3个，9本4个
+  if (store.townHallLevel >= 5) {
+    const maxWizardTowers = store.townHallLevel >= 9 ? 4 : store.townHallLevel >= 8 ? 3 : store.townHallLevel >= 6 ? 2 : 1
+    if (getBuildingCount('wizardtower') < maxWizardTowers) {
+      available.push({ type: 'wizardtower', name: '法师塔', cost: 200000 })
+    }
+  }
+  
+  // X连弩：9本2个
+  if (store.townHallLevel >= 9) {
+    if (getBuildingCount('xbow') < 2) {
+      available.push({ type: 'xbow', name: 'X连弩', cost: 1000000 })
+    }
+  }
+  
   if (store.townHallLevel >= 3 && !store.buildings.find(b => b.type === 'laboratory')) {
     available.push({ type: 'laboratory', name: '实验室', cost: 10000 })
   }
@@ -271,9 +313,12 @@ function getBuildingDesc(building) {
       (building.level >= effectiveMax && building.level < building.maxLevel ? ` (当前大本营最高${effectiveMax}级)` : ''),
     barracks: `训练容量 ${getBarracksCapacity(building.level)}`,
     darkbarracks: `暗黑训练容量 ${getDarkBarracksCapacity(building.level)}，训练暗黑兵种`,
-    cannon: `伤害 ${25 + building.level * 10}/次`,
-    archertower: `伤害 ${15 + building.level * 5}/次，可对空`,
-    mortar: `范围伤害 ${80 + building.level * 20}/发`,
+    cannon: `伤害 ${25 + building.level * 10}/次，攻击范围7格`,
+    archertower: `伤害 ${15 + building.level * 5}/次，可对空，攻击范围8格`,
+    mortar: `范围伤害 ${80 + building.level * 20}/发，攻击范围4-11格`,
+    airdefense: `伤害 ${120 + building.level * 30}/次，仅对空，攻击范围10格`,
+    wizardtower: `群体伤害 ${40 + building.level * 10}/秒，可对空，攻击范围7格`,
+    xbow: `伤害 ${80 + building.level * 10}/秒，可切换对空/对地，攻击范围14格`,
     laboratory: '研究升级兵种',
     darkelixirdrill: `产出 ${getDarkDrillProduction(building.level)} 暗黑重油/分钟`,
     darkstorage: `可存储 ${formatNumber(getDarkStorageCapacity(building.level))} 暗黑重油`,
@@ -320,6 +365,9 @@ function getUpgradeCost(building) {
     cannon: [1000, 3000, 10000, 50000, 100000, 200000, 300000, 500000],
     archertower: [2000, 5000, 10000, 100000, 200000, 300000, 500000],
     mortar: [100000, 200000, 300000, 500000],
+    airdefense: [150000, 300000, 500000],
+    wizardtower: [200000, 300000, 500000],
+    xbow: [1000000],
     laboratory: [100000, 200000, 500000, 1000000],
     // 暗黑重油钻井：1→2: 5万, 2→3: 10万
     darkelixirdrill: [50000, 100000],
@@ -364,8 +412,12 @@ function buildNew(nb) {
         elixircollector: 9,
         barracks: 8,
         darkbarracks: 3,
+        cannon: 9,
         archertower: 8,
         mortar: 5,
+        airdefense: 4,
+        wizardtower: 4,
+        xbow: 2,
         laboratory: 5,
         darkelixirdrill: 3,
         darkstorage: 3
