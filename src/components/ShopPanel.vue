@@ -24,8 +24,8 @@
     </div>
     
     <!-- 立即完成 -->
-    <h3 class="section-title" v-if="upgradingBuildings.length > 0 || store.trainingQueue.length > 0 || store.currentResearch">加速完成</h3>
-    <div class="speed-up-section" v-if="upgradingBuildings.length > 0 || store.trainingQueue.length > 0 || store.currentResearch">
+    <h3 class="section-title" v-if="upgradingBuildings.length > 0 || store.trainingQueue.length > 0 || store.currentResearch || clanCastleUpgrading">加速完成</h3>
+    <div class="speed-up-section" v-if="upgradingBuildings.length > 0 || store.trainingQueue.length > 0 || store.currentResearch || clanCastleUpgrading">
       <!-- 建筑升级加速 -->
       <div v-for="building in upgradingBuildings" :key="building.id" class="speed-card">
         <div class="speed-icon">{{ building.name.charAt(0) }}</div>
@@ -59,6 +59,18 @@
         </div>
         <button class="btn btn-speed" @click="speedUpResearch" :disabled="store.gems < getResearchSpeedCost()">
           {{ getResearchSpeedCost() }} 宝石 立即完成
+        </button>
+      </div>
+      
+      <!-- 部落城堡升级加速 -->
+      <div v-if="clanCastleUpgrading" class="speed-card">
+        <div class="speed-icon castle-icon">城</div>
+        <div class="speed-info">
+          <h4>部落城堡 {{ store.clanCastle.level === 0 ? '建造中' : '升级中' }}</h4>
+          <p>剩余 {{ formatTime(getClanCastleRemaining()) }}</p>
+        </div>
+        <button class="btn btn-speed" @click="speedUpClanCastle" :disabled="store.gems < getClanCastleSpeedCost()">
+          {{ getClanCastleSpeedCost() }} 宝石 立即完成
         </button>
       </div>
     </div>
@@ -121,6 +133,11 @@ const store = useGameStore()
 
 // 获取正在升级的建筑
 const upgradingBuildings = computed(() => store.buildings.filter(b => b.upgrading))
+
+// 获取部落城堡升级状态
+const clanCastleUpgrading = computed(() => {
+  return store.upgradeQueue.find(q => q.buildingId === 'clancastle')
+})
 
 // 获取建筑剩余时间（秒）
 function getRemainingTime(building) {
@@ -186,6 +203,30 @@ function speedUpResearch() {
       troop.level = store.currentResearch.targetLevel
     }
     store.currentResearch = null
+  }
+}
+
+// 获取部落城堡升级剩余时间
+function getClanCastleRemaining() {
+  const item = clanCastleUpgrading.value
+  if (!item) return 0
+  return Math.max(0, Math.ceil((item.endTime - Date.now()) / 1000))
+}
+
+// 计算部落城堡加速费用
+function getClanCastleSpeedCost() {
+  const seconds = getClanCastleRemaining()
+  return Math.max(1, Math.ceil(seconds / 60))
+}
+
+// 加速部落城堡升级
+function speedUpClanCastle() {
+  const cost = getClanCastleSpeedCost()
+  if (store.gems >= cost && clanCastleUpgrading.value) {
+    store.gems -= cost
+    // 立即完成升级
+    clanCastleUpgrading.value.endTime = Date.now()
+    store.checkUpgrades()
   }
 }
 
@@ -573,6 +614,11 @@ function claimOffer() {
 .speed-icon.research-icon {
   background: #e3f2fd;
   color: #2196f3;
+}
+
+.speed-icon.castle-icon {
+  background: #f3e5f5;
+  color: #9c27b0;
 }
 
 .speed-info {

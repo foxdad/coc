@@ -13,10 +13,16 @@
         <DefensePanel v-else-if="store.currentMenu === 'defense'" />
         <AttackPanel v-else-if="store.currentMenu === 'attack'" />
         <BattleFieldPanel v-else-if="store.currentMenu === 'battlefield'" />
+        <ClanCastlePanel v-else-if="store.currentMenu === 'clancastle'" />
+        <NeighborPanel v-else-if="store.currentMenu === 'neighbors'" />
+        <BattleLogPanel v-else-if="store.currentMenu === 'battlelog'" />
         <ShopPanel v-else-if="store.currentMenu === 'shop'" />
         <SettingsPanel v-else-if="store.currentMenu === 'settings'" />
       </main>
     </div>
+    
+    <!-- 新手引导 -->
+    <TutorialGuide />
   </div>
 </template>
 
@@ -36,6 +42,10 @@ import SettingsPanel from './components/SettingsPanel.vue'
 import HeroesPanel from './components/HeroesPanel.vue'
 import CampaignPanel from './components/CampaignPanel.vue'
 import BattleFieldPanel from './components/BattleFieldPanel.vue'
+import ClanCastlePanel from './components/ClanCastlePanel.vue'
+import NeighborPanel from './components/NeighborPanel.vue'
+import BattleLogPanel from './components/BattleLogPanel.vue'
+import TutorialGuide from './components/TutorialGuide.vue'
 
 const store = useGameStore()
 
@@ -48,13 +58,16 @@ const hasUpgrades = computed(() => {
 onMounted(() => {
   store.initGame()
   
-  // 每10秒检查一次：升级完成、训练完成、资源收集、树木生长、建筑工人疲劳
+  // 每10秒检查一次：升级完成、训练完成、资源收集、树木生长、建筑工人疲劳、邻邦漂移
   setInterval(() => {
     store.checkUpgrades()
     store.checkTraining()
     store.collectResources()
     store.checkTreeGrowth()
     store.checkBuilderFatigue()
+    store.checkNeighborDrift()
+    store.checkNeighborGrowth()
+    store.updateNeighborStrength()
   }, 10000)
 })
 </script>

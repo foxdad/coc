@@ -71,7 +71,7 @@
     </div>
     
     <!-- 升级/研究/训练进度条区域 -->
-    <div class="upgrade-bar" v-if="upgradingBuildings.length > 0 || store.currentResearch || store.trainingQueue.length > 0">
+    <div class="upgrade-bar" v-if="upgradingBuildings.length > 0 || store.currentResearch || store.trainingQueue.length > 0 || clanCastleUpgrading">
       <div class="upgrade-list">
         <!-- 建筑升级进度 -->
         <div 
@@ -85,6 +85,17 @@
           </div>
           <div class="upgrade-progress">
             <div class="upgrade-fill" :style="{ width: getUpgradeProgress(item) + '%' }"></div>
+          </div>
+        </div>
+        
+        <!-- 部落城堡升级进度 -->
+        <div v-if="clanCastleUpgrading" class="upgrade-item">
+          <div class="upgrade-info">
+            <span class="upgrade-name">部落城堡 {{ store.clanCastle.level === 0 ? '建造中' : `Lv${store.clanCastle.level}→${clanCastleUpgrading.targetLevel}` }}</span>
+            <span class="upgrade-time">{{ formatTime(getClanCastleRemaining()) }}</span>
+          </div>
+          <div class="upgrade-progress">
+            <div class="upgrade-fill" :style="{ width: getClanCastleProgress() + '%' }"></div>
           </div>
         </div>
         
@@ -159,6 +170,28 @@ const upgradingBuildings = computed(() => {
   const _ = tick.value
   return store.buildings.filter(b => b.upgrading)
 })
+
+// 获取部落城堡升级状态
+const clanCastleUpgrading = computed(() => {
+  const _ = tick.value
+  return store.upgradeQueue.find(q => q.buildingId === 'clancastle')
+})
+
+// 获取部落城堡升级剩余时间
+function getClanCastleRemaining() {
+  const item = clanCastleUpgrading.value
+  if (!item) return 0
+  return Math.max(0, Math.ceil((item.endTime - Date.now()) / 1000))
+}
+
+// 获取部落城堡升级进度
+function getClanCastleProgress() {
+  const item = clanCastleUpgrading.value
+  if (!item) return 0
+  const total = item.endTime - item.startTime
+  const elapsed = Date.now() - item.startTime
+  return Math.min(100, Math.max(0, (elapsed / total) * 100))
+}
 
 // 获取剩余时间（秒）
 function getRemainingTime(building) {

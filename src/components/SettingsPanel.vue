@@ -86,6 +86,58 @@
       </div>
     </div>
     
+    <!-- 帮助 -->
+    <div class="settings-section">
+      <div class="section-header">
+        <h3 class="section-title">帮助</h3>
+        <p class="section-desc">新手引导与游戏帮助</p>
+      </div>
+      
+      <div class="settings-item">
+        <div class="item-info">
+          <div class="item-title">新手引导</div>
+          <div class="item-desc">重新查看游戏玩法介绍</div>
+        </div>
+        <button class="action-btn" @click="showTutorial">
+          <span class="btn-icon">📖</span>
+          查看引导
+        </button>
+      </div>
+    </div>
+    
+    <!-- 关于 -->
+    <div class="settings-section">
+      <div class="section-header">
+        <h3 class="section-title">关于</h3>
+        <p class="section-desc">项目信息与交流群</p>
+      </div>
+      
+      <div class="settings-item">
+        <div class="item-info">
+          <div class="item-title">开源地址</div>
+          <div class="item-desc">查看项目源代码，欢迎 Star ⭐</div>
+        </div>
+        <a href="https://github.com/foxdad/coc" target="_blank" class="link-btn">
+          <span class="btn-icon">📦</span>
+          GitHub
+        </a>
+      </div>
+      
+      <div class="settings-item">
+        <div class="item-info">
+          <div class="item-title">QQ交流群</div>
+          <div class="item-desc">加入群聊，反馈问题或交流游戏心得</div>
+        </div>
+        <a href="https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_KEY&jump_from=webapi&authKey=YOUR_AUTH" 
+           target="_blank" 
+           class="link-btn qq-btn"
+           @click.prevent="joinQQGroup">
+          <span class="btn-icon">💬</span>
+          650772312
+        </a>
+      </div>
+    </div>
+    
     <!-- 提示消息 -->
     <div v-if="message" class="message" :class="{ error: isError, success: !isError }">
       {{ message }}
@@ -261,6 +313,20 @@ function handleClear() {
       location.reload()
     }
   }
+}
+
+// 加入QQ群
+function joinQQGroup() {
+  window.open('https://qm.qq.com/cgi-bin/qm/qr?k=650772312&jump_from=webapi', '_blank')
+}
+
+// 显示新手引导
+function showTutorial() {
+  store.tutorialCompleted = false
+  store.tutorialStep = 1
+  // 通过自定义事件触发引导
+  window.dispatchEvent(new CustomEvent('start-tutorial'))
+  showMessage('引导已开启，请查看页面提示')
 }
 </script>
 
@@ -472,5 +538,37 @@ function handleClear() {
 .message.error {
   background: var(--error-bg);
   color: var(--error-text);
+}
+
+/* 链接按钮 */
+.link-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--text-primary);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.link-btn:hover {
+  background: var(--text-primary);
+  color: var(--bg-card);
+}
+
+.link-btn.qq-btn {
+  background: #12B7F5;
+  color: #fff;
+  border-color: #12B7F5;
+}
+
+.link-btn.qq-btn:hover {
+  background: #0d9fd8;
+  border-color: #0d9fd8;
 }
 </style>

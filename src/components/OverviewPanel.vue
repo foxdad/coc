@@ -2,6 +2,19 @@
   <div class="panel">
     <h2 class="panel-title">村庄总览</h2>
 
+    <!-- 首席日记 -->
+    <div class="diary-card">
+      <div class="diary-header">
+        <span class="diary-icon">📜</span>
+        <span class="diary-title">首席日记</span>
+        <span class="diary-time">{{ diaryTime }}</span>
+      </div>
+      <div class="diary-content">
+        <p>{{ currentDiary }}</p>
+      </div>
+      <button class="diary-refresh" @click="refreshDiary" title="换一条">🔄</button>
+    </div>
+
     <!-- 大本营主卡片 -->
     <div class="main-card">
       <div class="main-card-header">
@@ -177,6 +190,133 @@ const store = useGameStore()
 const treeResult = ref(null)
 let treeResultTimer = null
 let treeGrowthTimer = null
+let diaryTimer = null
+
+// 首席日记
+const currentDiary = ref('')
+const diaryTime = ref('')
+
+// 日记模板库
+const diaryTemplates = {
+  // 通用日记
+  general: [
+    '阳光明媚的一天，村民们都在辛勤劳作。',
+    '今天天气不错，适合升级建筑。',
+    '远处传来野蛮人的训练声，村庄一片祥和。',
+    '夜幕降临，防御塔上的火把照亮了整个村庄。',
+    '清晨的露水打湿了草地，新的一天开始了。',
+    '微风吹过，金矿旁的旗帜轻轻飘扬。',
+  ],
+  // 建筑工人相关
+  builder: [
+    '建筑工人老王今天格外卖力，一边干活一边哼着小曲。',
+    '工人小李在金矿旁偷偷喝了口圣水，被我逮个正着。',
+    '建筑工人们正在讨论下一个升级哪个建筑。',
+    '老王说他年轻时一天能盖三座箭塔，现在只能盖两座了。',
+    '工人们抱怨最近加班太多，我决定给他们加点宝石奖励。',
+  ],
+  // 资源相关
+  resource: [
+    '金矿产量不错，储金罐快满了，得赶紧花掉。',
+    '圣水收集器嗡嗡作响，紫色的液体源源不断流入。',
+    '今天收成不错，金币和圣水都增加了不少。',
+    '资源充足，是时候考虑升级大本营了。',
+  ],
+  // 军队相关
+  troops: [
+    '野蛮人们在训练场挥舞着大刀，气势汹汹。',
+    '弓箭手们正在练习射击，箭无虚发。',
+    '巨人在角落里打盹，鼾声如雷。',
+    '哥布林偷偷溜进了储金罐，被我一脚踢了出来。',
+    '法师在研究新的火球术，差点把实验室烧了。',
+  ],
+  // 防御相关
+  defense: [
+    '加农炮刚刚保养完毕，炮管锃亮。',
+    '箭塔上的弓箭手警惕地注视着远方。',
+    '城墙又加固了一层，固若金汤。',
+    '迫击炮手说他能打中一公里外的苍蝇，我表示怀疑。',
+  ],
+  // 特殊状态
+  lowResource: [
+    '资源告急！得赶紧去掠夺一波了。',
+    '储金罐空空如也，野蛮人们都饿瘦了。',
+    '圣水不够用了，连训练野蛮人都成问题。',
+  ],
+  richResource: [
+    '资源多得用不完，真是幸福的烦恼。',
+    '金币堆成了小山，得找个地方花掉。',
+    '圣水都快溢出来了，赶紧训练点部队。',
+  ],
+  noArmy: [
+    '兵营空空如也，该训练点部队了。',
+    '没有军队怎么去打仗？赶紧训练！',
+  ],
+  fullArmy: [
+    '军队整装待发，是时候出征了！',
+    '部队已满员，敌人们颤抖吧！',
+  ],
+  upgrading: [
+    '叮叮当当的声音不绝于耳，建筑工人们正在忙碌。',
+    '升级进行中，再等等就能变得更强了。',
+  ],
+  builderTired: [
+    '建筑工人们看起来很疲惫，需要休息一下。',
+    '老王打了个哈欠，说他需要喝杯咖啡。',
+  ],
+}
+
+// 生成日记
+function generateDiary() {
+  const templates = []
+  
+  // 根据状态选择合适的日记
+  const goldPercent = store.gold / store.maxGold
+  const elixirPercent = store.elixir / store.maxElixir
+  
+  // 资源状态
+  if (goldPercent < 0.2 || elixirPercent < 0.2) {
+    templates.push(...diaryTemplates.lowResource)
+  } else if (goldPercent > 0.8 && elixirPercent > 0.8) {
+    templates.push(...diaryTemplates.richResource)
+  } else {
+    templates.push(...diaryTemplates.resource)
+  }
+  
+  // 军队状态
+  if (store.currentArmy === 0) {
+    templates.push(...diaryTemplates.noArmy)
+  } else if (store.currentArmy >= store.armyCapacity * 0.9) {
+    templates.push(...diaryTemplates.fullArmy)
+  } else {
+    templates.push(...diaryTemplates.troops)
+  }
+  
+  // 建筑工人状态
+  if (store.freeBuilders === 0) {
+    templates.push(...diaryTemplates.upgrading)
+  }
+  if (store.builderFatigue < 50) {
+    templates.push(...diaryTemplates.builderTired)
+  }
+  
+  // 添加通用和其他类型
+  templates.push(...diaryTemplates.general)
+  templates.push(...diaryTemplates.builder)
+  templates.push(...diaryTemplates.defense)
+  
+  // 随机选择一条
+  const randomIndex = Math.floor(Math.random() * templates.length)
+  currentDiary.value = templates[randomIndex]
+  
+  // 更新时间
+  const now = new Date()
+  diaryTime.value = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+}
+
+function refreshDiary() {
+  generateDiary()
+}
 
 onMounted(() => {
   // 每分钟检查树木生长
@@ -185,11 +325,17 @@ onMounted(() => {
   }, 60000)
   // 初始检查一次
   store.checkTreeGrowth()
+  
+  // 生成初始日记
+  generateDiary()
+  // 每2分钟更新一次日记
+  diaryTimer = setInterval(generateDiary, 120000)
 })
 
 onUnmounted(() => {
   if (treeGrowthTimer) clearInterval(treeGrowthTimer)
   if (treeResultTimer) clearTimeout(treeResultTimer)
+  if (diaryTimer) clearInterval(diaryTimer)
 })
 
 function getTreeIcon(type) {
@@ -262,6 +408,7 @@ const resourceBuildings = computed(() => {
 })
 
 const nextUnlocks = computed(() => {
+  // 只显示已实现的功能
   const unlocks = {
     2: [
       { name: '箭塔', type: '防御', icon: '箭' },
@@ -275,7 +422,6 @@ const nextUnlocks = computed(() => {
     ],
     4: [
       { name: '防空火箭', type: '防御', icon: '防' },
-      { name: '法术工厂', type: '功能', icon: '法' },
       { name: '气球兵', type: '兵种', icon: '气' },
     ],
     5: [
@@ -284,24 +430,26 @@ const nextUnlocks = computed(() => {
       { name: '法师', type: '兵种', icon: '师' },
     ],
     6: [
-      { name: '空气炮', type: '防御', icon: '空' },
       { name: '天使', type: '兵种', icon: '天' },
-      { name: '治疗法术', type: '法术', icon: '治' },
     ],
     7: [
       { name: '暗黑重油', type: '资源', icon: '暗' },
+      { name: '暗黑兵营', type: '功能', icon: '暗' },
       { name: '野蛮人之王', type: '英雄', icon: '王' },
       { name: '飞龙', type: '兵种', icon: '龙' },
+      { name: '亡灵', type: '兵种', icon: '亡' },
+      { name: '野猪骑士', type: '兵种', icon: '猪' },
     ],
     8: [
-      { name: '炸弹塔', type: '防御', icon: '弹' },
       { name: '皮卡超人', type: '兵种', icon: '皮' },
       { name: '戈仑石人', type: '兵种', icon: '戈' },
+      { name: '女武神', type: '兵种', icon: '女' },
     ],
     9: [
       { name: 'X连弩', type: '防御', icon: 'X' },
       { name: '弓箭女皇', type: '英雄', icon: '皇' },
       { name: '熔岩猎犬', type: '兵种', icon: '熔' },
+      { name: '女巫', type: '兵种', icon: '巫' },
     ],
   }
   return unlocks[store.townHallLevel + 1] || []
@@ -339,6 +487,94 @@ function upgradeTownHall() {
   font-weight: 600;
   margin-bottom: 24px;
   color: var(--text-primary);
+}
+
+/* 首席日记 */
+.diary-card {
+  background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+  border: 1px solid #ffe082;
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+[data-theme="dark"] .diary-card {
+  background: linear-gradient(135deg, #3e2723 0%, #4e342e 100%);
+  border-color: #5d4037;
+}
+
+.diary-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.diary-icon {
+  font-size: 20px;
+}
+
+.diary-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #8d6e63;
+}
+
+[data-theme="dark"] .diary-title {
+  color: #bcaaa4;
+}
+
+.diary-time {
+  font-size: 12px;
+  color: #a1887f;
+  margin-left: auto;
+  padding-right: 32px;
+}
+
+.diary-content {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #5d4037;
+  font-style: italic;
+}
+
+[data-theme="dark"] .diary-content {
+  color: #d7ccc8;
+}
+
+.diary-content p {
+  margin: 0;
+}
+
+.diary-refresh {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(141, 110, 99, 0.1);
+  border-radius: 50%;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diary-refresh:hover {
+  background: rgba(141, 110, 99, 0.2);
+  transform: rotate(180deg);
+}
+
+[data-theme="dark"] .diary-refresh {
+  background: rgba(188, 170, 164, 0.1);
+}
+
+[data-theme="dark"] .diary-refresh:hover {
+  background: rgba(188, 170, 164, 0.2);
 }
 
 .section {

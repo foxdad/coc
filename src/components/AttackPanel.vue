@@ -29,7 +29,8 @@
     <div class="search-section">
       <div class="search-card" v-if="!currentTarget">
         <p>消耗金币搜索可攻击的村庄</p>
-        <button class="btn" @click="searchTarget" :disabled="store.gold < 100">
+        <p class="no-army-hint" v-if="store.currentArmy === 0">⚠️ 没有可用军队，请先训练部队</p>
+        <button class="btn" @click="searchTarget" :disabled="store.gold < 100 || store.currentArmy === 0">
           🔍 搜索对手 (100 金币)
         </button>
       </div>
@@ -116,6 +117,23 @@
                     <span class="t-level">Lv.{{ troop.level }}</span>
                   </div>
                   <span class="t-count">{{ troop.count - getDeployedCount(troop.id) }}</span>
+                </div>
+              </div>
+              
+              <!-- 援军区域 -->
+              <div class="cc-troops" v-if="store.clanCastle.level > 0 && store.clanCastle.troops.length > 0">
+                <h4>🏰 援军</h4>
+                <div class="troops-list cc-list">
+                  <div v-for="(troop, index) in store.clanCastle.troops" :key="'cc-' + index"
+                    class="troop-item cc-item" :class="{ selected: selectedTroop?.isClanCastle && selectedTroop?.ccIndex === index, depleted: troop.count - getDeployedCCCount(index) <= 0 }"
+                    @click="selectCCTroop(troop, index)">
+                    <span class="t-icon">{{ getTroopIcon(troop.name) }}</span>
+                    <div class="t-info">
+                      <span class="t-name">{{ troop.name }}</span>
+                      <span class="t-level">Lv.{{ troop.level }}</span>
+                    </div>
+                    <span class="t-count">{{ troop.count - getDeployedCCCount(index) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -429,6 +447,11 @@ async function startTextBattle() {
   store.trophies = Math.max(0, store.trophies + trophiesGained)
   store.builders.forEach(b => { b.fatigue = Math.max(0, (b.fatigue ?? 100) - (10 + Math.floor(Math.random() * 11))) })
   
+  // 清空使用的援军
+  if (store.clanCastle.troops.length > 0) {
+    store.clearClanCastleTroops()
+  }
+  
   battleResult.value = { victory, stars, destruction, goldGained, elixirGained, trophiesGained }
   battleHistory.value.unshift({ victory, stars, targetName: target.name, goldGained, trophiesGained })
   if (battleHistory.value.length > 5) battleHistory.value.pop()
@@ -662,6 +685,23 @@ function selectTroop(troop) {
   selectedTroop.value = selectedTroop.value?.id === troop.id ? null : troop
 }
 
+// 选择援军
+function selectCCTroop(troop, index) {
+  if (troop.count <= getDeployedCCCount(index)) return
+  const ccTroop = {
+    ...troop,
+    id: 'cc-' + index,
+    isClanCastle: true,
+    ccIndex: index
+  }
+  selectedTroop.value = selectedTroop.value?.ccIndex === index ? null : ccTroop
+}
+
+// 获取已部署的援军数量
+function getDeployedCCCount(ccIndex) {
+  return deployedTroops.value.filter(t => t.isClanCastle && t.ccIndex === ccIndex).length
+}
+
 function handleStageClick() {
   if (!selectedTroop.value || isVisualBattling.value) return
   const pos = stage.getPointerPosition()
@@ -674,18 +714,28 @@ function handleStageClick() {
 
 function placeTroop(troop, x, y) {
   const cfg = troopConfig[troop.name]
-  if (!cfg || getDeployedCount(troop.id) >= troop.count) { selectedTroop.value = null; return }
+  if (!cfg) { selectedTroop.value = null; return }
+  
+  // 检查是否还有可部署的兵
+  if (troop.isClanCastle) {
+    if (getDeployedCCCount(troop.ccIndex) >= troop.count) { selectedTroop.value = null; return }
+  } else {
+    if (getDeployedCount(troop.id) >= troop.count) { selectedTroop.value = null; return }
+  }
   
   const levelBonus = 1 + (troop.level - 1) * 0.1
   const deployed = {
     id: Date.now() + Math.random(), troopId: troop.id, name: troop.name, level: troop.level,
     x, y, hp: cfg.hp * levelBonus, maxHp: cfg.hp * levelBonus, dps: cfg.dps * levelBonus,
-    isAir: cfg.isAir, speed: 2, alive: true, prefer: cfg.prefer || 'any', jumpWall: cfg.jumpWall
+    isAir: cfg.isAir, speed: 2, alive: true, prefer: cfg.prefer || 'any', jumpWall: cfg.jumpWall,
+    isClanCastle: troop.isClanCastle || false,
+    ccIndex: troop.ccIndex
   }
   
   const group = new Konva.Group({ x, y })
-  // 兵种圆圈（稍大一点以容纳文字）
-  group.add(new Konva.Circle({ radius: 9, fill: cfg.color, stroke: '#fff', strokeWidth: 1.5 }))
+  // 兵种圆圈（援军用金色边框）
+  const strokeColor = troop.isClanCastle ? '#ffd700' : '#fff'
+  group.add(new Konva.Circle({ radius: 9, fill: cfg.color, stroke: strokeColor, strokeWidth: troop.isClanCastle ? 2 : 1.5 }))
   // 兵种名称第一个字
   const nameText = new Konva.Text({
     text: troop.name.charAt(0),
@@ -985,6 +1035,11 @@ async function startVisualBattle() {
   store.addElixir(elixirGained)
   store.trophies = Math.max(0, store.trophies + trophiesGained)
   
+  // 清空使用的援军
+  if (store.clanCastle.troops.length > 0) {
+    store.clearClanCastleTroops()
+  }
+  
   battleResult.value = { victory, stars, destruction, goldGained, elixirGained, trophiesGained, deadCount, survivingCount }
   battleHistory.value.unshift({ victory, stars, targetName: target.name, goldGained, trophiesGained })
   if (battleHistory.value.length > 5) battleHistory.value.pop()
@@ -1111,6 +1166,7 @@ onUnmounted(() => {
 .search-section { margin-bottom: 20px; }
 .search-card { background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: 12px; padding: 32px; text-align: center; }
 .search-card p { color: var(--text-secondary); margin-bottom: 16px; }
+.no-army-hint { color: #ff9800; font-size: 14px; }
 
 .target-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; }
 .target-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
@@ -1162,6 +1218,11 @@ onUnmounted(() => {
 
 .troop-selector { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 .troop-selector h4 { margin: 0 0 10px; font-size: 14px; color: var(--text-primary); }
+.cc-troops { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+.cc-troops h4 { color: #ffd700; }
+.cc-list { max-height: 150px; }
+.cc-item { border-color: rgba(255, 215, 0, 0.3); }
+.cc-item.selected { border-color: #ffd700; background: rgba(255, 215, 0, 0.1); }
 .troops-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; max-height: 400px; }
 .troop-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--hover-bg); border: 2px solid transparent; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
 .troop-item:hover { border-color: var(--border-color); }
